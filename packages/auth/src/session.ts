@@ -52,9 +52,24 @@ export async function requireUser(requestHeaders: Headers): Promise<AppSession> 
     throw new HttpError(403, "Hesap aktif değil");
   }
 
-  const activeTenantId =
+  let activeTenantId =
     (session.session as { activeTenantId?: string | null }).activeTenantId ??
     null;
+
+  // Auto-select sole active membership (demo / single-tenant UX).
+  if (!activeTenantId) {
+    const sole = await prisma.userMembership.findMany({
+      where: { userId: user.id, status: "active" },
+      take: 2,
+    });
+    if (sole.length === 1 && sole[0]) {
+      activeTenantId = sole[0].tenantId;
+      await prisma.session.update({
+        where: { token: session.session.token },
+        data: { activeTenantId },
+      });
+    }
+  }
 
   let membership: AppMembership | null = null;
   if (activeTenantId) {
