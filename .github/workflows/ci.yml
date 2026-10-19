@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, phase-1-iam]
   pull_request:
     branches: [main]
 
@@ -12,30 +12,37 @@ concurrency:
 
 jobs:
   verify:
-    name: Install · Generate · Typecheck · Lint · Build
+    name: Install · Migrate · Test · Typecheck · Lint · Build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     services:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: sustainability
-          POSTGRES_PASSWORD: sustainability
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: sustainability
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U sustainability -d sustainability"
+          --health-cmd "pg_isready -U postgres -d sustainability"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
 
     env:
-      DATABASE_URL: postgresql://sustainability:sustainability@localhost:5432/sustainability?schema=public
-      AUTH_STUB_USER_ID: user_ci
-      AUTH_STUB_TENANT_ID: tenant_ci
-      AUTH_STUB_EMAIL: ci@example.com
+      # Privileged bootstrap URL (migrations / role setup)
+      ADMIN_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sustainability?schema=public
+      # App role used after ensure-app-role (RLS-effective)
+      DATABASE_URL: postgresql://sustainability_app:sustainability_app@localhost:5432/sustainability?schema=public
+      DB_APP_ROLE: sustainability_app
+      DB_APP_PASSWORD: sustainability_app
+      DB_NAME: sustainability
+      BETTER_AUTH_SECRET: ci-test-secret-not-for-production
+      BETTER_AUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      AUTH_MFA_REQUIRED: "false"
 
     steps:
       - name: Checkout
@@ -58,8 +65,21 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
-      - name: Apply migrations
+      - name: Apply migrations (admin)
+        env:
+          DATABASE_URL: ${{ env.ADMIN_DATABASE_URL }}
         run: pnpm db:migrate:deploy
+
+      - name: Ensure non-superuser app role (RLS)
+        env:
+          DATABASE_URL: ${{ env.ADMIN_DATABASE_URL }}
+        run: pnpm --filter @sustainability/db ensure-app-role
+
+      - name: Seed system roles
+        run: pnpm db:seed
+
+      - name: Negative tenant isolation tests
+        run: pnpm test:isolation
 
       - name: Build packages
         run: pnpm --filter @sustainability/db --filter @sustainability/auth build
