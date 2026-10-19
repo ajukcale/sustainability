@@ -22,6 +22,7 @@
     "src/**/*.test.ts",
     "src/debug-*.ts",
     "src/seed-cli.ts",
-    "src/demote-app-role.ts"
+    "src/demote-app-role.ts",
+    "src/ensure-app-role.ts"
   ]
 }

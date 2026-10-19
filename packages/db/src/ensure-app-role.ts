@@ -10,14 +10,14 @@ import { resolve } from "node:path";
 loadEnv({ path: resolve(process.cwd(), ".env") });
 loadEnv({ path: resolve(process.cwd(), "../../.env") });
 
-const adminUrl = process.env.ADMIN_DATABASE_URL ?? process.env.DATABASE_URL;
+const adminUrlRaw = process.env.ADMIN_DATABASE_URL ?? process.env.DATABASE_URL;
+if (!adminUrlRaw) {
+  throw new Error("ADMIN_DATABASE_URL or DATABASE_URL is required");
+}
+const adminUrl: string = adminUrlRaw;
 const appRole = process.env.DB_APP_ROLE ?? "sustainability_app";
 const appPassword = process.env.DB_APP_PASSWORD ?? "sustainability_app";
 const dbName = process.env.DB_NAME ?? "sustainability";
-
-if (!adminUrl) {
-  throw new Error("ADMIN_DATABASE_URL or DATABASE_URL is required");
-}
 
 function quoteIdent(id: string) {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(id)) {
