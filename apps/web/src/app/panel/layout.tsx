@@ -58,6 +58,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
       ) : null}
       <nav className="nav">
         <Link href="/panel">Özet</Link>
+        <Link href="/panel/veri">Veri</Link>
         <Link href="/panel/organizasyon">Organizasyon</Link>
         <Link href="/panel/kullanicilar">Kullanıcılar</Link>
         <button

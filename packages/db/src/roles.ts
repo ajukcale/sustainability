@@ -23,6 +23,11 @@ export const PERMISSIONS = {
   ORG_READ: "org:read",
   ORG_MANAGE: "org:manage",
   AUDIT_READ: "audit:read",
+  DATA_READ: "data:read",
+  DATA_WRITE: "data:write",
+  DATA_APPROVE: "data:approve",
+  DATA_LOCK: "data:lock",
+  DATA_IMPORT: "data:import",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -32,7 +37,6 @@ export type RoleSeed = {
   name: string;
   description: string;
   permissions: Permission[];
-  /** Platform-only role (no tenantId when seeded as catalog). */
   platformOnly?: boolean;
 };
 
@@ -62,6 +66,11 @@ export const SYSTEM_ROLES: RoleSeed[] = [
       PERMISSIONS.ORG_READ,
       PERMISSIONS.ORG_MANAGE,
       PERMISSIONS.AUDIT_READ,
+      PERMISSIONS.DATA_READ,
+      PERMISSIONS.DATA_WRITE,
+      PERMISSIONS.DATA_APPROVE,
+      PERMISSIONS.DATA_LOCK,
+      PERMISSIONS.DATA_IMPORT,
     ],
   },
   {
@@ -76,6 +85,11 @@ export const SYSTEM_ROLES: RoleSeed[] = [
       PERMISSIONS.ORG_READ,
       PERMISSIONS.ORG_MANAGE,
       PERMISSIONS.AUDIT_READ,
+      PERMISSIONS.DATA_READ,
+      PERMISSIONS.DATA_WRITE,
+      PERMISSIONS.DATA_APPROVE,
+      PERMISSIONS.DATA_LOCK,
+      PERMISSIONS.DATA_IMPORT,
     ],
   },
   {
@@ -86,30 +100,67 @@ export const SYSTEM_ROLES: RoleSeed[] = [
       PERMISSIONS.USER_READ,
       PERMISSIONS.ORG_READ,
       PERMISSIONS.AUDIT_READ,
+      PERMISSIONS.DATA_READ,
+      PERMISSIONS.DATA_WRITE,
+      PERMISSIONS.DATA_APPROVE,
+      PERMISSIONS.DATA_LOCK,
+      PERMISSIONS.DATA_IMPORT,
     ],
   },
   {
     key: ROLE_KEYS.DATA_ENTRY,
     name: "Data Entry",
-    description: "Veri girişi (Phase 2+)",
-    permissions: [PERMISSIONS.ORG_READ],
+    description: "Veri girişi",
+    permissions: [
+      PERMISSIONS.ORG_READ,
+      PERMISSIONS.DATA_READ,
+      PERMISSIONS.DATA_WRITE,
+      PERMISSIONS.DATA_IMPORT,
+    ],
   },
   {
     key: ROLE_KEYS.ANALYST,
     name: "Analyst",
     description: "Analist",
-    permissions: [PERMISSIONS.ORG_READ, PERMISSIONS.AUDIT_READ],
+    permissions: [
+      PERMISSIONS.ORG_READ,
+      PERMISSIONS.AUDIT_READ,
+      PERMISSIONS.DATA_READ,
+    ],
   },
   {
     key: ROLE_KEYS.VIEWER,
     name: "Viewer",
     description: "İzleyici / yönetici görünümü",
-    permissions: [PERMISSIONS.ORG_READ],
+    permissions: [PERMISSIONS.ORG_READ, PERMISSIONS.DATA_READ],
   },
   {
     key: ROLE_KEYS.AUDITOR,
     name: "Auditor",
     description: "Denetçi — salt okunur + audit",
-    permissions: [PERMISSIONS.ORG_READ, PERMISSIONS.USER_READ, PERMISSIONS.AUDIT_READ],
+    permissions: [
+      PERMISSIONS.ORG_READ,
+      PERMISSIONS.USER_READ,
+      PERMISSIONS.AUDIT_READ,
+      PERMISSIONS.DATA_READ,
+    ],
   },
 ];
+
+export const ACTIVITY_CATEGORIES = [
+  "energy",
+  "water",
+  "material",
+  "production",
+  "logistics",
+  "waste",
+] as const;
+
+export type ActivityCategory = (typeof ACTIVITY_CATEGORIES)[number];
+
+export const ACTIVITY_STATUS = {
+  DRAFT: "draft",
+  VALIDATED: "validated",
+  APPROVED: "approved",
+  LOCKED: "locked",
+} as const;

@@ -55,6 +55,16 @@ export async function ensureTenantRoles(tenantId: string) {
           isSystem: true,
         },
       });
+    } else {
+      await prisma.role.update({
+        where: { id: existing.id },
+        data: {
+          name: role.name,
+          description: role.description,
+          permissions: role.permissions,
+          isSystem: true,
+        },
+      });
     }
   }
 }

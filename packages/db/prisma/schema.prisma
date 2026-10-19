@@ -25,6 +25,9 @@ model User {
   memberships   UserMembership[]
   auditEvents   AuditEvent[]      @relation("AuditActor")
   invitesSent   Invite[]          @relation("InviteSender")
+  activityData  ActivityData[]    @relation("ActivityCreator")
+  importJobs    ImportJob[]
+  evidenceFiles EvidenceFile[]
 
   @@unique([email])
   @@map("user")
@@ -92,11 +95,15 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships UserMembership[]
-  orgUnits    OrgUnit[]
-  auditEvents AuditEvent[]
-  invites     Invite[]
-  roles       Role[]
+  memberships   UserMembership[]
+  orgUnits      OrgUnit[]
+  auditEvents   AuditEvent[]
+  invites       Invite[]
+  roles         Role[]
+  activityData  ActivityData[]
+  periodLocks   PeriodLock[]
+  importJobs    ImportJob[]
+  evidenceFiles EvidenceFile[]
 
   @@map("tenants")
 }
@@ -177,8 +184,10 @@ model OrgUnit {
 
   tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   parent   OrgUnit?             @relation("OrgUnitTree", fields: [parentId], references: [id], onDelete: Restrict)
-  children OrgUnit[]            @relation("OrgUnitTree")
-  scopes   MembershipOrgScope[]
+  children      OrgUnit[]            @relation("OrgUnitTree")
+  scopes        MembershipOrgScope[]
+  activityData  ActivityData[]
+  evidenceFiles EvidenceFile[]
 
   @@index([tenantId])
   @@index([tenantId, parentId])
@@ -224,4 +233,128 @@ model AuditEvent {
   @@index([tenantId])
   @@index([tenantId, createdAt])
   @@map("audit_events")
+}
+
+// ─── Phase 2: activity data ingest ──────────────────────────────────────────
+
+/// Operational activity record (energy first; other MVP categories supported).
+model ActivityData {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  orgUnitId    String   @map("org_unit_id")
+  /// energy | water | material | production | logistics | waste
+  category     String
+  /// YYYY-MM period key
+  periodKey    String   @map("period_key")
+  quantity     Decimal  @db.Decimal(18, 6)
+  unit         String
+  /// actual | forecast | scenario
+  recordType   String   @default("actual") @map("record_type")
+  /// draft | validated | approved | locked
+  status       String   @default("draft")
+  /// manual | excel | csv | api
+  source       String   @default("manual")
+  sourceRef    String?  @map("source_ref")
+  /// Content hash for re-upload dedupe
+  contentHash  String?  @map("content_hash")
+  revision     Int      @default(1)
+  notes        String?
+  /// Category-specific fields (e.g. energyCarrier, fuelType)
+  attributes   Json?
+  qualityFlag  String?  @map("quality_flag")
+  createdById  String?  @map("created_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orgUnit    OrgUnit         @relation(fields: [orgUnitId], references: [id], onDelete: Restrict)
+  createdBy  User?           @relation("ActivityCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  revisions  ActivityRevision[]
+  evidence   EvidenceFile[]
+
+  @@unique([tenantId, orgUnitId, category, periodKey, recordType, contentHash])
+  @@index([tenantId])
+  @@index([tenantId, periodKey])
+  @@index([tenantId, category, status])
+  @@map("activity_data")
+}
+
+model ActivityRevision {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  activityDataId String   @map("activity_data_id")
+  revision       Int
+  snapshot       Json
+  changedById    String?  @map("changed_by_id")
+  changeReason   String?  @map("change_reason")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  activityData ActivityData @relation(fields: [activityDataId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([activityDataId])
+  @@map("activity_revisions")
+}
+
+model PeriodLock {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  periodKey  String   @map("period_key")
+  category   String   @default("*")
+  lockedAt   DateTime @default(now()) @map("locked_at")
+  lockedById String?  @map("locked_by_id")
+  reason     String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, periodKey, category])
+  @@index([tenantId])
+  @@map("period_locks")
+}
+
+model ImportJob {
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  fileName     String    @map("file_name")
+  /// csv | excel
+  format       String    @default("csv")
+  status       String    @default("pending")
+  /// validating | ready | importing | completed | failed
+  totalRows    Int       @default(0) @map("total_rows")
+  validRows    Int       @default(0) @map("valid_rows")
+  errorRows    Int       @default(0) @map("error_rows")
+  importedRows Int       @default(0) @map("imported_rows")
+  errors       Json?
+  createdById  String?   @map("created_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  completedAt  DateTime? @map("completed_at")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("import_jobs")
+}
+
+model EvidenceFile {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  activityDataId String?  @map("activity_data_id")
+  orgUnitId      String?  @map("org_unit_id")
+  fileName       String   @map("file_name")
+  /// Relative storage key under tenant prefix
+  storageKey     String   @map("storage_key")
+  mimeType       String?  @map("mime_type")
+  sizeBytes      Int      @map("size_bytes")
+  uploadedById   String?  @map("uploaded_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  activityData ActivityData? @relation(fields: [activityDataId], references: [id], onDelete: Cascade)
+  orgUnit      OrgUnit?      @relation(fields: [orgUnitId], references: [id], onDelete: SetNull)
+  uploadedBy   User?         @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([activityDataId])
+  @@map("evidence_files")
 }

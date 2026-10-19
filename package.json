@@ -19,7 +19,7 @@
     "db:demote-role": "pnpm --filter @sustainability/db demote-role",
     "db:ensure-app-role": "pnpm --filter @sustainability/db ensure-app-role",
     "test": "vitest run",
-    "test:isolation": "vitest run packages/db/src/isolation.test.ts"
+    "test:isolation": "vitest run packages/db/src/isolation.test.ts packages/db/src/activity-isolation.test.ts"
   },
   "devDependencies": {
     "dotenv": "^18.0.8",

@@ -20,6 +20,7 @@
   "include": ["src/**/*.ts"],
   "exclude": [
     "src/**/*.test.ts",
+    "src/*-isolation.test.ts",
     "src/debug-*.ts",
     "src/seed-cli.ts",
     "src/demote-app-role.ts",
