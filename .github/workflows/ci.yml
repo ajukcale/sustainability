@@ -61,11 +61,14 @@ jobs:
       - name: Apply migrations
         run: pnpm db:migrate:deploy
 
+      - name: Build packages
+        run: pnpm --filter @sustainability/db --filter @sustainability/auth build
+
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Lint
         run: pnpm lint
 
-      - name: Build
-        run: pnpm build
+      - name: Build web
+        run: pnpm --filter @sustainability/web build
