@@ -7,6 +7,8 @@ coverage
 .env.local
 .env.*.local
 packages/db/.env
+.data
+apps/web/.data
 *.log
 .DS_Store
 .turbo

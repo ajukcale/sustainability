@@ -31,11 +31,14 @@ export {
   ROLE_KEYS,
   PERMISSIONS,
   SYSTEM_ROLES,
+  ACTIVITY_CATEGORIES,
+  ACTIVITY_STATUS,
   type RoleKey,
   type Permission,
   type RoleSeed,
+  type ActivityCategory,
 } from "./roles";
-export { seedSystemRoles, ensureTenantRoles } from "./seed";
+export { seedSystemRoles, ensureTenantRoles, seedDemoAdmin } from "./seed";
 
 /** Lightweight readiness probe for /api/ready. */
 export async function checkDatabaseReady(): Promise<{
