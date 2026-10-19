@@ -19,7 +19,8 @@
     "migrate:deploy": "prisma migrate deploy",
     "studio": "prisma studio",
     "seed": "tsx src/seed-cli.ts",
-    "demote-role": "tsx src/demote-app-role.ts"
+    "demote-role": "tsx src/demote-app-role.ts",
+    "ensure-app-role": "tsx src/ensure-app-role.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",

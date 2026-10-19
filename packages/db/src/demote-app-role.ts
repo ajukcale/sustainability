@@ -45,7 +45,12 @@ async function main() {
         `ALTER ROLE failed but role is already non-superuser; continuing.`,
       );
     } else {
-      throw err;
+      console.warn(
+        `Could not demote ${role} (bootstrap/superuser restriction). ` +
+          `Use \`pnpm --filter @sustainability/db ensure-app-role\` and connect as the app role.`,
+      );
+      console.warn(err);
+      // Non-fatal for local docker bootstrap users; CI uses ensure-app-role instead.
     }
   }
 
