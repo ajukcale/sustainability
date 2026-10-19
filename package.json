@@ -2,6 +2,7 @@
   "name": "sustainability",
   "private": true,
   "version": "0.0.0",
+  "type": "module",
   "packageManager": "pnpm@10.33.4",
   "engines": {
     "node": ">=20"
@@ -13,10 +14,16 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "db:generate": "pnpm --filter @sustainability/db generate",
     "db:migrate": "pnpm --filter @sustainability/db migrate:dev",
-    "db:migrate:deploy": "pnpm --filter @sustainability/db migrate:deploy"
+    "db:migrate:deploy": "pnpm --filter @sustainability/db migrate:deploy",
+    "db:seed": "pnpm --filter @sustainability/db seed",
+    "db:demote-role": "pnpm --filter @sustainability/db demote-role",
+    "test": "vitest run",
+    "test:isolation": "vitest run packages/db/src/isolation.test.ts"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "dotenv": "^18.0.8",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

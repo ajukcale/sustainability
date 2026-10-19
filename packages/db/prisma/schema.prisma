@@ -7,75 +7,210 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Tenant (organization / customer account).
+// ─── Better Auth core ───────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  /// Account lifecycle: active | suspended | deactivated
+  status        String    @default("active")
+
+  sessions      Session[]
+  accounts      Account[]
+  memberships   UserMembership[]
+  auditEvents   AuditEvent[]      @relation("AuditActor")
+  invitesSent   Invite[]          @relation("InviteSender")
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id             String   @id @default(cuid())
+  expiresAt      DateTime
+  token          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  /// Active tenant from auth context (never from client body alone)
+  activeTenantId String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+// ─── Multi-tenant domain ────────────────────────────────────────────────────
+
 model Tenant {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  /// active | suspended | deactivated
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   memberships UserMembership[]
   orgUnits    OrgUnit[]
   auditEvents AuditEvent[]
+  invites     Invite[]
+  roles       Role[]
 
   @@map("tenants")
 }
 
-/// Platform user identity (global; memberships bind to tenants).
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+/// System-wide or tenant-scoped role definition (seeded BRD roles).
+model Role {
+  id          String   @id @default(cuid())
+  /// Null tenantId = platform/system role catalog entry
+  tenantId    String?  @map("tenant_id")
+  key         String
+  name        String
+  description String?
+  permissions String[] @default([])
+  isSystem    Boolean  @default(true) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
+  tenant      Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   memberships UserMembership[]
-  auditEvents AuditEvent[]
+  invites     Invite[]
 
-  @@map("users")
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@map("roles")
 }
 
-/// User ↔ tenant membership with role stub (Phase 1 expands RBAC).
 model UserMembership {
   id        String   @id @default(cuid())
   tenantId  String   @map("tenant_id")
   userId    String   @map("user_id")
-  role      String   @default("member")
+  roleId    String   @map("role_id")
+  /// active | invited | suspended | deactivated
+  status    String   @default("active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role                   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  orgScopes MembershipOrgScope[]
 
   @@unique([tenantId, userId])
   @@index([tenantId])
+  @@index([userId])
   @@map("user_memberships")
 }
 
-/// Organizational unit tree (company → site → line/unit).
-model OrgUnit {
-  id        String   @id @default(cuid())
-  tenantId  String   @map("tenant_id")
-  parentId  String?  @map("parent_id")
-  name      String
-  type      String   @default("unit")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+/// Data-level org scope for a membership (empty = whole tenant, subject to role).
+model MembershipOrgScope {
+  id           String @id @default(cuid())
+  membershipId String @map("membership_id")
+  orgUnitId    String @map("org_unit_id")
+  tenantId     String @map("tenant_id")
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parent   OrgUnit?  @relation("OrgUnitTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children OrgUnit[] @relation("OrgUnitTree")
+  membership UserMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  orgUnit    OrgUnit        @relation(fields: [orgUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, orgUnitId])
+  @@index([tenantId])
+  @@map("membership_org_scopes")
+}
+
+/// Org tree: company → facility → line/unit. Soft active/inactive; rows preserved.
+model OrgUnit {
+  id             String    @id @default(cuid())
+  tenantId       String    @map("tenant_id")
+  parentId       String?   @map("parent_id")
+  name           String
+  /// company | facility | line | unit
+  type           String    @default("unit")
+  code           String?
+  isActive       Boolean   @default(true) @map("is_active")
+  deactivatedAt  DateTime? @map("deactivated_at")
+  /// Prior name retained when renamed (history)
+  previousName   String?   @map("previous_name")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   OrgUnit?             @relation("OrgUnitTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children OrgUnit[]            @relation("OrgUnitTree")
+  scopes   MembershipOrgScope[]
 
   @@index([tenantId])
   @@index([tenantId, parentId])
+  @@index([tenantId, isActive])
   @@map("org_units")
 }
 
-/// Immutable audit trail stub (Phase 1+ expands actors/actions).
+model Invite {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  email       String
+  roleId      String    @map("role_id")
+  token       String    @unique
+  /// JSON array of org unit ids for data-level scope
+  orgUnitIds  String[]  @default([]) @map("org_unit_ids")
+  invitedById String?   @map("invited_by_id")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role      Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  invitedBy User?  @relation("InviteSender", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([email])
+  @@map("invites")
+}
+
 model AuditEvent {
   id         String   @id @default(cuid())
-  tenantId   String   @map("tenant_id")
+  tenantId   String?  @map("tenant_id")
   actorId    String?  @map("actor_id")
   action     String
   entityType String   @map("entity_type")
@@ -83,8 +218,8 @@ model AuditEvent {
   metadata   Json?
   createdAt  DateTime @default(now()) @map("created_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  actor  User?  @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor  User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([tenantId, createdAt])

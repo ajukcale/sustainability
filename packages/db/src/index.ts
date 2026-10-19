@@ -1,4 +1,11 @@
+import { config as loadEnv } from "dotenv";
+import { resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
+
+// Load root or package .env for scripts/tests (Next.js loads its own).
+loadEnv({ path: resolve(process.cwd(), ".env") });
+loadEnv({ path: resolve(process.cwd(), "../../.env") });
+loadEnv({ path: resolve(process.cwd(), "packages/db/.env") });
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
@@ -9,7 +16,7 @@ export const prisma =
   new PrismaClient({
     log:
       process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
+        ? ["error", "warn"]
         : ["error"],
   });
 
@@ -19,6 +26,16 @@ if (process.env.NODE_ENV !== "production") {
 
 export { PrismaClient };
 export type * from "@prisma/client";
+export { withTenantRls, setTenantContext } from "./rls";
+export {
+  ROLE_KEYS,
+  PERMISSIONS,
+  SYSTEM_ROLES,
+  type RoleKey,
+  type Permission,
+  type RoleSeed,
+} from "./roles";
+export { seedSystemRoles, ensureTenantRoles } from "./seed";
 
 /** Lightweight readiness probe for /api/ready. */
 export async function checkDatabaseReady(): Promise<{

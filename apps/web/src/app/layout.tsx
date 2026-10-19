@@ -1,17 +1,27 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Fraunces, Source_Sans_3 } from "next/font/google";
+import "./globals.css";
+
+const display = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display-loaded",
+});
+
+const body = Source_Sans_3({
+  subsets: ["latin"],
+  variable: "--font-body-loaded",
+});
 
 export const metadata: Metadata = {
   title: "Sürdürülebilirlik",
-  description: "Multi-tenant sustainability SaaS — Phase 0 foundation",
+  description: "Çok kiracılı sürdürülebilirlik SaaS — IAM ve organizasyon",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="tr">
-      <body style={{ fontFamily: "system-ui, sans-serif", margin: 0 }}>
-        {children}
-      </body>
+      <body className={`${display.variable} ${body.variable}`}>{children}</body>
     </html>
   );
 }
